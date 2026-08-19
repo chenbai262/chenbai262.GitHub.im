@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 【新增】破解图片防盗链的代码，可以让部分第三方图片正常显示 -->
+    <meta name="referrer" content="no-referrer">
+    
+    <title>Our Story - 极简情侣空间</title>
+    <!-- 引入思源宋体，增加高级感 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        /* ==========================================
+           【1】全局变量与基础设置
+           ========================================== */
+        :root {
+            --bg-color: #ffffff;      
+            --text-main: #1a1a1a;     
+            --text-muted: #888888;    
+            --gray-light: #f5f5f5;    
+            --gray-dark: #333333;     
+            --font-main: 'Noto Serif SC', serif; 
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* 去除手机端点击高亮 */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ==========================================
+           【2】加载画面
+           ========================================== */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        .loading-text {
+            font-size: 1.2rem;
+            letter-spacing: 5px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* ==========================================
+           【3】手机级仿锁屏界面
+           ========================================== */
+        #lock-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            z-index: 9000; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 12vh 0 10vh;
+            transition: transform 0.7s cubic-bezier(0.8, 0, 0.2, 1), opacity 0.7s ease;
+        }
+        #lock-screen.unlocked {
+            transform: translateY(-100%); 
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .lock-header { text-align: center; }
+        .lock-time {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 4.5rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            line-height: 1;
+        }
+        .lock-date {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        .lock-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .lock-prompt {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+            transition: color 0.3s;
+        }
+        .lock-prompt.error { color: #d9534f; } 
+        
+        .pass-dots {
+            display: flex;
+            gap: 22px;
+            margin-bottom: 40px;
+        }
+        .dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 1px solid var(--text-main);
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .dot.filled { background-color: var(--text-main); }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-15px); }
+            40%, 80% { transform: translateX(15px); }
+        }
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px 30px;
+        }
+        .num-btn {
+            width: 75px; height: 75px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 2.2rem;
+            font-weight: 300;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .num-btn:active, .num-btn:hover { background-color: var(--gray-light); }
+        .num-del { font-size: 1.5rem; color: var(--text-muted); }
+
+        /* ==========================================
+           【4】左上角音乐播放器
+           ========================================== */
+        #music-player {
+            position: fixed;
+            top: 25px; left: 25px;
+            z-index: 1000;
+            display: flex; align-items: center;
+            background: var(--bg-color);
+            padding: 8px 18px;
+            border: 1px solid #eaeaea;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            opacity: 0; 
+            transition: opacity 1s ease, transform 0.3s;
+        }
+        #music-player:hover { transform: scale(1.02); border-color: #ccc; }
+        .music-controls {
+            display: flex; gap: 15px; align-items: center;
+            font-size: 0.9rem; color: var(--text-muted);
+        }
+        .music-btn {
+            cursor: pointer; transition: color 0.3s; font-family: sans-serif; 
+        }
+        .music-btn:hover { color: var(--text-main); }
+        #track-name {
+            font-size: 0.75rem; max-width: 80px;
+            white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; letter-spacing: 1px;
+        }
+
+        /* ==========================================
+           【5】主页内容区 
+           ========================================== */
+        #main-content {
+            position: relative;
+            z-index: 1;
+        }
+        header {
+            text-align: center; padding: 80px 20px 30px; border-bottom: 1px solid #eee;
+        }
+        h1 {
+            font-size: 2rem; font-weight: 400; letter-spacing: 2px; margin-bottom: 10px;
+        }
+        .timer {
+            color: var(--text-muted); font-size: 0.9rem; letter-spacing: 1px; margin-bottom: 30px;
+        }
+        .nav {
+            display: flex; justify-content: center; gap: 30px;
+        }
+        .nav span {
+            cursor: pointer; color: var(--text-muted); padding-bottom: 5px; transition: all 0.3s ease;
+        }
+        .nav span:hover, .nav span.active {
+            color: var(--text-main); border-bottom: 1px solid var(--text-main);
+        }
+        .content-section {
+            display: none; max-width: 800px; margin: 40px auto; padding: 0 20px 80px; animation: fadeIn 0.5s ease;
+        }
+        .content-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 相册模块 */
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .photo-card { background: var(--gray-light); padding: 10px; text-align: center; transition: transform 0.3s; }
+        .photo-card:hover { transform: translateY(-5px); }
+        .photo-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; filter: grayscale(20%); transition: filter 0.3s; }
+        .photo-card:hover img { filter: grayscale(0%); }
+        .photo-desc { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); }
+
+        /* 聊天记录 */
+        .chat-box { display: flex; flex-direction: column; gap: 20px; }
+        .msg { display: flex; max-width: 70%; }
+        .msg-left { align-self: flex-start; }
+        .msg-right { align-self: flex-end; flex-direction: row-reverse; }
+        .bubble { padding: 12px 18px; border-radius: 4px; font-size: 0.95rem; }
+        .msg-left .bubble { background-color: var(--gray-light); color: var(--text-main); }
+        .msg-right .bubble { background-color: var(--gray-dark); color: #ffffff; }
+        .msg-time { font-size: 0.75rem; color: #ccc; margin-top: 5px; text-align: center; }
+
+        /* 便签 */
+        .memo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+        .memo-card { background-color: var(--gray-light); padding: 20px; border-left: 2px solid var(--text-main); }
+        .memo-text { font-size: 0.9rem; margin-bottom: 15px; }
+        .memo-date { font-size: 0.75rem; color: var(--text-muted); text-align: right; }
+
+        /* 信封 */
+        .envelope-container { display: flex; flex-direction: column; gap: 30px; align-items: center; }
+        .envelope { width: 300px; height: 180px; background-color: var(--gray-light); position: relative; cursor: pointer; display: flex; justify-content: center; align-items: center; border: 1px solid #ddd; transition: all 0.4s; }
+        .envelope::before { content: 'CLICK TO OPEN'; font-size: 0.8rem; letter-spacing: 2px; color: var(--text-muted); }
+        .envelope:hover { border-color: var(--text-main); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .letter-content { display: none; width: 100%; max-width: 600px; background: #fff; padding: 40px; border: 1px solid #eee; box-shadow: 0 5px 15px rgba(0,0,0,0.02); font-size: 0.95rem; line-height: 2; }
+        .letter-content.open { display: block; animation: fadeIn 0.8s ease; }
+    </style>
+</head>
+<body>
+
+    <!-- ================== 1. 加载画面 ================== -->
+    <div id="loading">
+        <div class="loading-text">LOADING OUR MEMORIES</div>
+    </div>
+
+    <!-- ================== 2. 仿手机锁屏界面 ================== -->
+    <div id="lock-screen">
+        <div class="lock-header">
+            <!-- 实时时间显示 -->
+            <div id="lock-time" class="lock-time">00:00</div>
+            <div id="lock-date" class="lock-date">1月1日 星期一</div>
+        </div>
+
+        <div class="lock-body">
+            <div id="lock-prompt" class="lock-prompt">请输入密码</div>
+            
+            <div class="pass-dots" id="dots-container">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+
+            <div class="numpad">
+                <button class="num-btn" onclick="pressNum('1')">1</button>
+                <button class="num-btn" onclick="pressNum('2')">2</button>
+                <button class="num-btn" onclick="pressNum('3')">3</button>
+                <button class="num-btn" onclick="pressNum('4')">4</button>
+                <button class="num-btn" onclick="pressNum('5')">5</button>
+                <button class="num-btn" onclick="pressNum('6')">6</button>
+                <button class="num-btn" onclick="pressNum('7')">7</button>
+                <button class="num-btn" onclick="pressNum('8')">8</button>
+                <button class="num-btn" onclick="pressNum('9')">9</button>
+                <div></div> 
+                <button class="num-btn" onclick="pressNum('0')">0</button>
+                <button class="num-btn num-del" onclick="delNum()">⌫</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== 3. 解锁后的主内容区 ================== -->
+    <div id="main-content">
+        <!-- 左上角音乐播放器 -->
+        <div id="music-player">
+            <audio id="bg-music"></audio>
+            <div class="music-controls">
+                <span id="play-btn" class="music-btn" onclick="toggleMusic()">▶</span>
+                <span id="next-btn" class="music-btn" onclick="nextTrack()">⏭</span>
+                <span id="track-name">Loading...</span>
+            </div>
+        </div>
+
+        <!-- 头部区域 -->
+        <header>
+            <h1>莫徐生 & 夏夏</h1>
+            <div class="timer">取次花丛懒回顾，半缘修道半缘君。</div>
+            
+            <div class="nav">
+                <span class="active" onclick="switchTab('album')">相册</span>
+                <span onclick="switchTab('chat')">聊天</span>
+                <span onclick="switchTab('memo')">便签</span>
+                <span onclick="switchTab('letter')">信封</span>
+            </div>
+        </header>
+
+        <!-- 【一】相册模块 -->
+        <main id="album" class="content-section active">
+            <div class="gallery">
+                <div class="photo-card">
+                    <img src="1.jpg" alt="photo">
+                    <div class="photo-desc">2026.08.16小小的月亮，大大的梦🌙</div>
+                </div>
+                <div class="photo-card">
+                    <img src="2.jpg" alt="photo">
+                    <div class="photo-desc">2026.08.17 像猫的某人和像某人的猫^_^ </div>
+                </div>
+                <div class="photo-card">
+                    <img src="3.jpg" alt="photo">
+                    <div class="photo-desc">2026.08.19 背景音下的悄悄话</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 【二】聊天记录模块 -->
+        <main id="chat" class="content-section">
+            <div class="chat-box">
+                <div class="msg-time">2023年 10月 12日</div>
+                <div class="msg msg-left">
+                    <div class="bubble">今天下班想吃什么呀？</div>
+                </div>
+                <div class="msg msg-right">
+                    <div class="bubble">去吃上次那家日料怎么样？我定好位置了。</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 【三】便签模块 -->
+        <main id="memo" class="content-section">
+            <div class="memo-grid">
+                <div class="memo-card">
+                    <div class="memo-text">记得提醒他吃胃药，最近总是熬夜加班，要注意身体。</div>
+                    <div class="memo-date">- 2023.08.15</div>
+                </div>
+                <div class="memo-card">
+                    <div class="memo-text">下个月的周年纪念日，准备偷偷给他买那块他看中很久的手表。</div>
+                    <div class="memo-date">- 2023.09.02</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 【四】信封储存模块 -->
+        <main id="letter" class="content-section">
+            <div class="envelope-container">
+                <div class="envelope" onclick="toggleLetter('letter1')"></div>
+                <div class="letter-content" id="letter1">
+                    <p><strong>亲爱的：</strong></p><br>
+                    <p>这是我写给你的第一封信。</p>
+                    <p>在这个快节奏的时代，我依然觉得文字是最能沉淀情感的方式。很高兴能与你相遇，从陌生到熟悉，每一次的牵手、拥抱，都让我觉得世界变得特别温柔。</p>
+                    <p>未来还很长，希望我们能一直保持这份简单和纯粹。不盲从，不焦躁，慢慢走，好好爱。</p><br>
+                    <p style="text-align: right;">爱你的某某<br>2023年12月31日</p>
+                </div>
+            </div>
+        </main>
+    </div> <!-- 主内容区结束 -->
+
+    <!-- ==========================================
+         【JS 逻辑控制区】
+         ========================================== -->
+    <script>
+        /* ================= 1. 锁屏密码系统逻辑 ================= */
+        const CORRECT_PWD = "0817"; // 在这里更改你的初始密码
+        let inputPwd = "";
+        
+        const dots = document.querySelectorAll('.dot');
+        const dotsContainer = document.getElementById('dots-container');
+        const lockScreen = document.getElementById('lock-screen');
+        const lockPrompt = document.getElementById('lock-prompt');
+
+        function updateDots() {
+            dots.forEach((dot, index) => {
+                if(index < inputPwd.length) dot.classList.add('filled');
+                else dot.classList.remove('filled');
+            });
+        }
+
+        function pressNum(num) {
+            if(inputPwd.length < 4) {
+                inputPwd += num;
+                updateDots();
+            }
+            if(inputPwd.length === 4) {
+                setTimeout(checkPassword, 150); 
+            }
+        }
+
+        function delNum() {
+            if(inputPwd.length > 0) {
+                inputPwd = inputPwd.slice(0, -1);
+                updateDots();
+            }
+        }
+
+        function checkPassword() {
+            if(inputPwd === CORRECT_PWD) {
+                lockScreen.classList.add('unlocked');
+                setTimeout(() => {
+                    document.getElementById('music-player').style.opacity = '1';
+                    if (audio.paused) {
+                        audio.play();
+                        playBtn.innerText = "♬"; 
+                    }
+                }, 500); 
+            } else {
+                dotsContainer.classList.add('shake');
+                lockPrompt.innerText = "密码错误";
+                lockPrompt.classList.add('error');
+                
+                setTimeout(() => {
+                    dotsContainer.classList.remove('shake');
+                    inputPwd = "";
+                    updateDots();
+                    lockPrompt.innerText = "请输入密码";
+                    lockPrompt.classList.remove('error');
+                }, 500);
+            }
+        }
+
+        /* ================= 2. 锁屏实时时钟逻辑 ================= */
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('lock-time').innerText = `${hours}:${minutes}`;
+            
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const day = days[now.getDay()];
+            document.getElementById('lock-date').innerText = `${month}月${date}日 ${day}`;
+        }
+        setInterval(updateClock, 1000); 
+        updateClock(); 
+
+        /* ================= 3. 音乐播放器逻辑 ================= */
+        const playlist = [
+            { name: "First Love", src: "https://downsc.chinaz.net/Files/DownLoad/sound1/201906/11582.mp3" }, 
+            { name: "温柔的夜", src: "https://downsc.chinaz.net/Files/DownLoad/sound1/201808/10411.mp3" },
+            { name: "安静纯音乐", src: "https://downsc.chinaz.net/Files/DownLoad/sound1/201803/9954.mp3" }
+        ];
+        let currentTrackIndex = 0;
+        const audio = document.getElementById('bg-music');
+        const playBtn = document.getElementById('play-btn');
+        const trackNameLabel = document.getElementById('track-name');
+
+        function loadTrack(index) {
+            audio.src = playlist[index].src;
+            trackNameLabel.innerText = playlist[index].name;
+        }
+
+        function toggleMusic() {
+            if (audio.paused) {
+                audio.play();
+                playBtn.innerText = "♬"; 
+            } else {
+                audio.pause();
+                playBtn.innerText = "▶"; 
+            }
+        }
+
+        function nextTrack() {
+            currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+            loadTrack(currentTrackIndex);
+            if (playBtn.innerText === "♬") {
+                audio.play();
+            }
+        }
+        audio.addEventListener('ended', nextTrack);
+        loadTrack(0);
+
+        /* ================= 4. 页面其他交互逻辑 ================= */
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('loading').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                }, 800);
+            }, 1500); 
+        };
+
+        function switchTab(tabId) {
+            const sections = document.querySelectorAll('.content-section');
+            sections.forEach(sec => sec.classList.remove('active'));
+            const navs = document.querySelectorAll('.nav span');
+            navs.forEach(nav => nav.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function toggleLetter(letterId) {
+            const letter = document.getElementById(letterId);
+            if(letter.classList.contains('open')) {
+                letter.classList.remove('open');
+            } else {
+                letter.classList.add('open');
+            }
+        }
+    </script>
+</body>
+</html>
